@@ -4,9 +4,9 @@ Cooking...
 
 # Roadmap
 
-- Place offers on existing listings [DONE]
+- [DONE] Place offers on existing listings
 
-- Support collection-wide offers
+- [DONE] Support collection-wide offers
 
 - Add functionality to place offers on loan that are expiring
 
