@@ -12,10 +12,9 @@ type PlaceOfferParams = {
 async function placeOffer({ loanTerms }: PlaceOfferParams) {
   try {
     const accountId = process.env.ACCOUNT_ID;
-    const apiKey = process.env.ARCADE_API_KEY;
     const privateKey = process.env.PRIVATE_KEY;
 
-    if (!accountId || !apiKey || !privateKey) {
+    if (!accountId || !privateKey) {
       throw new Error("Missing environment variables");
     }
 
@@ -74,7 +73,7 @@ async function main() {
     numInstallments: 0,
     interestRate: "1300000000000000000000", // 13 % amount of interest
     principal: "10000000", // 10
-    collateralAddress: "0x364c828ee171616a39897688a831c2499ad972ec", // fidenza
+    collateralAddress: "0x364c828ee171616a39897688a831c2499ad972ec", // Sappy Seal
     collateralId: 3278,
     payableCurrency: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // usdc
     nonce: Date.now(),

@@ -11,7 +11,6 @@ const COLLECTION_OFFER_VERIFIER = '0x1B6e58AaE43bFd2a435AA348F3328f3137DDA544';
 
 type PlaceCollectionOfferParams = {
   offerTerms: CollectionWideOfferPayload;
-  collectionAddress: string;
 };
 
 function createPredicate(collection: string) {
@@ -21,26 +20,25 @@ function createPredicate(collection: string) {
   };
 }
 
-async function placeCollectionOffer({ offerTerms, collectionAddress }: PlaceCollectionOfferParams) {
+async function placeCollectionOffer({ offerTerms }: PlaceCollectionOfferParams) {
   try {
     const accountId = process.env.ACCOUNT_ID;
-    const apiKey = process.env.ARCADE_API_KEY;
     const privateKey = process.env.PRIVATE_KEY;
 
-    if (!accountId || !apiKey || !privateKey) {
-      throw new Error("Missing environment variables");
+    if (!accountId || !privateKey) {
+      throw new Error("Wallet access not set");
     }
 
     const provider = new ethers.providers.JsonRpcProvider();
     const signer = new ethers.Wallet(privateKey, provider);
 
     const currentNonce = ethers.BigNumber.from(Date.now());
-    const itemPredicate = createPredicate(collectionAddress);
+    const itemPredicate = createPredicate(offerTerms.collateralAddress);
 
     const signature = await createCollectionWideOfferSignature(
       { ...offerTerms, nonce: currentNonce, items: [itemPredicate] },
       signer,
-      collectionAddress
+      offerTerms.collateralAddress
     );
 
     if (!signature) {
@@ -52,13 +50,13 @@ async function placeCollectionOffer({ offerTerms, collectionAddress }: PlaceColl
         durationSecs: ethers.BigNumber.from(offerTerms.durationSecs).toNumber(),
         principal: ethers.BigNumber.from(offerTerms.principal).toString(),
         proratedInterestRate: ethers.BigNumber.from(offerTerms.proratedInterestRate).toString(),
-        collateralAddress: collectionAddress,
+        collateralAddress: offerTerms.collateralAddress,
         collateralId: "-1",
         payableCurrency: offerTerms.payableCurrency,
         deadline: ethers.BigNumber.from(offerTerms.deadline).toString(),
         affiliateCode: offerTerms.affiliateCode
       },
-      collectionId: collectionAddress,
+      collectionId: offerTerms.collateralAddress,
       signature: signature,
       extraData: "0x0000000000000000000000000000000000000000000000000000000000000000",
       nonce: currentNonce.toString(),
@@ -71,13 +69,7 @@ async function placeCollectionOffer({ offerTerms, collectionAddress }: PlaceColl
 
     const response = await axios.post(
       `https://api.arcade.xyz/api/v2/accounts/${accountId}/loanterms/`,
-      apiPayload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': apiKey
-        }
-      }
+      apiPayload
     );
 
     console.log("Collection-wide offer placed successfully:", response.data);
@@ -103,10 +95,8 @@ async function main() {
     side: 1 // lender
   };
 
-  const collectionAddress = "0x364c828ee171616a39897688a831c2499ad972ec"; // Sappy Seal
-
   try {
-    const result = await placeCollectionOffer({ offerTerms, collectionAddress });
+    const result = await placeCollectionOffer({ offerTerms });
   } catch (error) {
     console.error("Failed to place collection-wide offer:", error);
   }
