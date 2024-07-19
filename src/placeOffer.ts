@@ -68,11 +68,11 @@ async function placeOffer({ loanTerms }: PlaceOfferParams) {
 
 async function main() {
   const loanTerms: LoanTermsPayload = {
-    durationSecs: 86400 * 1, // 1 day
+    durationSecs: 86400 * 30, // 30 days
     deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour
     numInstallments: 0,
     interestRate: "1300000000000000000000", // 13 % amount of interest
-    principal: "10000000", // 10
+    principal: "30000000", // 30 usdc
     collateralAddress: "0x364c828ee171616a39897688a831c2499ad972ec", // Sappy Seal
     collateralId: 3278,
     payableCurrency: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // usdc
