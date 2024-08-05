@@ -1,9 +1,7 @@
-// placeCollectionOffer.ts
-
 import axios from 'axios';
 import { ethers, BigNumberish } from 'ethers';
 import dotenv from 'dotenv';
-import { createCollectionWideOfferSignature, CollectionWideOfferPayload } from './createCollectionOfferSignature';
+import { createCollectionWideOfferSignature, CollectionWideOfferPayload, createPredicate } from './createCollectionOfferSignature';
 
 dotenv.config();
 
@@ -12,13 +10,6 @@ const COLLECTION_OFFER_VERIFIER = '0x1B6e58AaE43bFd2a435AA348F3328f3137DDA544';
 type PlaceCollectionOfferParams = {
   offerTerms: CollectionWideOfferPayload;
 };
-
-function createPredicate(collection: string) {
-  return {
-    verifier: COLLECTION_OFFER_VERIFIER,
-    data: ethers.utils.defaultAbiCoder.encode(['address'], [collection]),
-  };
-}
 
 async function placeCollectionOffer({ offerTerms }: PlaceCollectionOfferParams) {
   try {
@@ -35,8 +26,14 @@ async function placeCollectionOffer({ offerTerms }: PlaceCollectionOfferParams) 
     const currentNonce = ethers.BigNumber.from(Date.now());
     const itemPredicate = createPredicate(offerTerms.collateralAddress);
 
+    const signaturePayload = {
+      ...offerTerms,
+      nonce: currentNonce,
+      items: [itemPredicate],
+    };
+
     const signature = await createCollectionWideOfferSignature(
-      { ...offerTerms, nonce: currentNonce, items: [itemPredicate] },
+      signaturePayload,
       signer,
       offerTerms.collateralAddress
     );
@@ -48,8 +45,8 @@ async function placeCollectionOffer({ offerTerms }: PlaceCollectionOfferParams) 
     const apiPayload = {
       loanTerms: {
         durationSecs: ethers.BigNumber.from(offerTerms.durationSecs).toNumber(),
-        principal: ethers.BigNumber.from(offerTerms.principal).toString(),
-        proratedInterestRate: ethers.BigNumber.from(offerTerms.proratedInterestRate).toString(),
+        principal: offerTerms.principal,
+        proratedInterestRate: offerTerms.proratedInterestRate,
         collateralAddress: offerTerms.collateralAddress,
         collateralId: "-1",
         payableCurrency: offerTerms.payableCurrency,
@@ -61,7 +58,7 @@ async function placeCollectionOffer({ offerTerms }: PlaceCollectionOfferParams) 
       extraData: "0x0000000000000000000000000000000000000000000000000000000000000000",
       nonce: currentNonce.toString(),
       kind: "collection",
-      role: offerTerms.side === 1 ? "lender" : "borrower",
+      role: "lender",
       itemPredicates: [itemPredicate]
     };
 
@@ -80,28 +77,5 @@ async function placeCollectionOffer({ offerTerms }: PlaceCollectionOfferParams) 
     throw error;
   }
 }
-
-async function main() {
-  const offerTerms: CollectionWideOfferPayload = {
-    proratedInterestRate: "1300000000000000000000", // 13% interest rate
-    principal: "10000000", // 10 USDC
-    collateralAddress: "0x364c828ee171616a39897688a831c2499ad972ec", // Sappy Seal
-    durationSecs: 86400 * 1, // 1 day
-    items: [], // filled by the createCollectionWideOfferSignature function
-    payableCurrency: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // USDC
-    deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour
-    affiliateCode: ethers.constants.HashZero,
-    nonce: Date.now(),
-    side: 1 // lender
-  };
-
-  try {
-    const result = await placeCollectionOffer({ offerTerms });
-  } catch (error) {
-    console.error("Failed to place collection-wide offer:", error);
-  }
-}
-
-main();
 
 export { placeCollectionOffer };

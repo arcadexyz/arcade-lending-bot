@@ -1,7 +1,6 @@
 import { ethers, BigNumberish } from 'ethers';
 import { TypedDataDomain, TypedDataField } from '@ethersproject/abstract-signer';
 
-
 export const CONFIG_ETH_MAINNET_V3 = {
   chain: 'ethereum',
   network: 'mainnet',
@@ -37,21 +36,10 @@ export type LoanTermsPayload = {
   numInstallments: BigNumberish;
   interestRate: BigNumberish;
   principal: BigNumberish;
-  /**
-   * @dev This is the address of the collection used as collateral
-   * For Direct ERC721 Asset loans it will be the address of the collection
-   * For VAULT Loans it will be the VAULT FACTORY address. See config file
-   */
   collateralAddress: string;
-  /**
-   * @dev This is the address of the tokenId used as collateral
-   * For Direct ERC721 Asset loans it will be the tokenId of the asset
-   * For VAULT Loans it will be the tokenId (decimal representation of the vault address) of the vault.
-   */
-  collateralId: BigNumberish;
+  collateralId: string;
   payableCurrency: string;
   nonce: BigNumberish;
-  /* states if you are signing as the borrower or lender BORROWER: 0 LENDER: 1*/
   side: 0 | 1;
 };
 
@@ -70,13 +58,13 @@ export const createLoanTermsPayload = ({
     durationSecs,
     deadline,
     numInstallments: 0,
-    proratedInterestRate: ethers.utils.parseUnits(`${interestRate}`, 0),
-    principal: ethers.utils.parseUnits(`${principal}`, 0),
-    collateralAddress: collateralAddress,
-    collateralId: collateralId,
-    payableCurrency: payableCurrency,
-    nonce: nonce,
-    side: side,
+    proratedInterestRate: ethers.BigNumber.from(interestRate),
+    principal: ethers.BigNumber.from(principal),
+    collateralAddress,
+    collateralId: ethers.BigNumber.from(collateralId),
+    payableCurrency,
+    nonce,
+    side,
     affiliateCode: ethers.constants.HashZero,
   };
 };

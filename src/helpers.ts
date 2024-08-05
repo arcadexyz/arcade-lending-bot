@@ -1,85 +1,109 @@
-import { ethers } from "ethers";
-import { CONFIG } from "./config/config";
+  import { ethers, BigNumber } from "ethers";
+  import moment from 'moment';
 
-export const getNameByAddress = (address: string): string => {
-  const prodAddresses: { [key: string]: string } = {
-    "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": "ETH",
-    "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": "USDC",
-    "0xdAC17F958D2ee523a2206206994597C13D831ec7": "USDT",
-    "0x6b175474e89094c44da98b954eedeac495271d0f": "DAI",
-    "0x4d224452801aced8b2f0aebe155379bb5d594381": "APE",
-    "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599": "wBTC"
+  export type CurrencyCode = keyof typeof CURRENCY_INFO;
+
+  export const CURRENCY_INFO: { [key: string]: { address: string; decimals: number } } = {
+    "ETH":  { address: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", decimals: 18 },
+    "USDC": { address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", decimals: 6 },
+    "DAI":  { address: "0x6b175474e89094c44da98b954eedeac495271d0f", decimals: 18 },
   };
 
-  return address ? (prodAddresses[address.toLowerCase()] || "N/A") : "";
-};
-
-export const convertByCurrency = (currencyCode: string, amount: string): number => {
-  const decimals: { [key: string]: number } = {
-    "ETH": 18,
-    "USDC": 6,
-    "USDT": 6,
-    "DAI": 18,
-    "APE": 18,
-    "wBTC": 8
+  export const getNameByAddress = (address: string): string => {
+    const entry = Object.entries(CURRENCY_INFO).find(([_, info]) => 
+      info.address.toLowerCase() === address.toLowerCase()
+    );
+    return entry ? entry[0] : "N/A";
   };
 
-  const decimal = decimals[currencyCode] || 0;
-  return Number(amount) / Math.pow(10, decimal);
-};
-
-export function calculateRepaymentAmount(principal: string, interestRate: string, currencyDecimals: number): string {
-  const principalBN = ethers.BigNumber.from(principal);
-  const interestRateBN = ethers.BigNumber.from(interestRate);
-  
-  // Calculate interest: principal * interestRate / 10^22
-  const interest = principalBN.mul(interestRateBN).div(ethers.BigNumber.from(10).pow(22));
-  
-  // Repayment = principal + interest
-  return principalBN.add(interest).toString();
-}
-
-export function convertToDecimal(amount: string, decimals: number): number {
-  return parseFloat(ethers.utils.formatUnits(amount, decimals));
-}
-
-export const getCurrencyDecimals = (currencyCode: string): number => {
-  const decimals: { [key: string]: number } = {
-    "ETH": 18,
-    "USDC": 6,
-    "USDT": 6,
-    "DAI": 18,
-    "APE": 18,
-    "wBTC": 8
+  export const getCurrencyDecimals = (currencyCode: string | number): number => {
+    const code = typeof currencyCode === 'string' ? currencyCode.toUpperCase() : String(currencyCode).toUpperCase();
+    return CURRENCY_INFO[code]?.decimals || 18; // Default to 18 if not found
   };
 
-  return decimals[currencyCode] || 18; // Default to 18 if not found
-};
-
-export const calculateProtocolPrincipal = (
-  principal: string,
-  payableCurrency: "usdc" | "weth"
-): ethers.BigNumber => {
-  const decimals = CONFIG.token[payableCurrency].decimals;
-  return ethers.utils.parseUnits(principal, decimals);
-};
-
-export const makeDurationInSecs = (durationNumber: number, unit: "weeks" | "days"): number => {
-  const ONE_DAY_SECONDS = 86400;
-  const ONE_WEEK_SECONDS = ONE_DAY_SECONDS * 7;
-  return unit === "weeks" 
-    ? durationNumber * ONE_WEEK_SECONDS 
-    : durationNumber * ONE_DAY_SECONDS;
-};
-
-export const makeDeadline = (): number => {
-  const TWO_WEEKS = 14 * 24 * 60 * 60 * 1000; // 2 weeks in milliseconds
-  return Math.round((Date.now() + TWO_WEEKS) / 1000);
-};
-
-export const makePayableCurrency = (name: "weth" | "usdc"): { decimals: number; address: string } => {
-  return {
-    decimals: CONFIG.token[name].decimals,
-    address: CONFIG.token[name].address
+  export const convertByCurrency = (currencyCode: string | CurrencyCode, amount: string): string => {
+    const code = typeof currencyCode === 'string' ? currencyCode.toUpperCase() : currencyCode;
+    const decimals = getCurrencyDecimals(code);
+    return ethers.utils.formatUnits(amount, decimals);
   };
-};
+
+  export const calculateProtocolPrincipal = (
+    principal: string,
+    payableCurrency: string | number
+  ): BigNumber => {
+    const decimals = getCurrencyDecimals(payableCurrency);
+    return ethers.utils.parseUnits(principal, decimals);
+  };
+
+  export const makePayableCurrency = (name: string | number): { decimals: number; address: string } => {
+    const upperCaseName = typeof name === 'string' ? name.toUpperCase() : String(name).toUpperCase();
+    const currencyInfo = CURRENCY_INFO[upperCaseName];
+    return currencyInfo 
+      ? { decimals: currencyInfo.decimals, address: currencyInfo.address }
+      : { decimals: 18, address: '' };
+  };
+
+  export const calculateAPR = (
+    principal: BigNumber,
+    repayment: BigNumber,
+    durationSecs: number
+  ): number => {
+    const durationInDays = durationSecs / 86400;
+    const interestAmount = repayment.sub(principal);
+    
+    const initialRatio = interestAmount.mul(BigNumber.from(10).pow(8)).div(principal);
+    const dailyRate = initialRatio.div(BigNumber.from(durationInDays));
+    
+    const apr = dailyRate.mul(36500).div(BigNumber.from(10).pow(6));
+    
+    return Math.round(parseFloat(ethers.utils.formatUnits(apr, 2)) * 100) / 100;
+  };
+
+  export const calculateProtocolInterestRate = (principal: string, repayment: string): string => {
+    const principalBN = BigNumber.from(principal);
+    const repaymentBN = BigNumber.from(repayment);
+    const interestAmount = repaymentBN.sub(principalBN);
+    
+    return interestAmount.mul(BigNumber.from(10).pow(21)).div(principalBN).toString();
+  };
+
+  export const convertAPRtoProratedInterestRate = (apr: number, durationInDays: number): string => {
+    const dailyRate = apr / 365 / 100;
+    const proratedRate = dailyRate * durationInDays;
+    
+    return ethers.utils.parseUnits(proratedRate.toFixed(21), 21).toString();
+  };
+
+  export const calculateInterestRate = (
+    principal: string,
+    repayment: string
+  ): string => {
+    const principalBN = ethers.BigNumber.from(principal);
+    const repaymentBN = ethers.BigNumber.from(repayment);
+    const interestAmount = repaymentBN.sub(principalBN);
+    
+    return interestAmount.mul(ethers.BigNumber.from(10).pow(22)).div(principalBN).toString();
+  };
+
+  export const calculateRepaymentAmount = (
+    principal: string,
+    interestRate: string
+  ): string => {
+    const principalBN = ethers.BigNumber.from(principal);
+    const interestRateBN = ethers.BigNumber.from(interestRate);
+    
+    const interest = principalBN.mul(interestRateBN).div(ethers.BigNumber.from(10).pow(22));
+    const repayment = principalBN.add(interest);
+    
+    return repayment.toString();
+  };
+
+  export const formatInterestRateForArcade = (apr: number): string => {
+    return ethers.utils.parseUnits(apr.toString(), 16).toString();
+  };
+
+  export const makeDeadline = (minutes: number): number => {
+    return moment().add(minutes, 'minutes').unix();
+  };
+
+  export const daysToSeconds = (days: number): number => days * 24 * 60 * 60;

@@ -1,12 +1,16 @@
-
-import dotenv from 'dotenv';
+import inquirer from 'inquirer';
+import { ethers } from 'ethers';
 import moment from 'moment';
 import fs from 'fs';
-import { arcadeApiRequest, log } from './arcadeapi';
+import path from 'path';
+import { arcadeApiRequest } from './arcadeapi';
 import * as helpers from './helpers';
-import { ethers, BigNumberish } from 'ethers';
+import { setTimeout } from 'timers/promises';
+import { getHighestBid, getFloorPrice } from './reservoir';
 
-dotenv.config();
+const collectionsData = fs.readFileSync(path.join(__dirname, '..', 'collections_data.json'), 'utf8');
+const collections: { id: string; name: string }[] = JSON.parse(collectionsData);
+const collectionNameMap = new Map(collections.map(c => [c.id, c.name]));
 
 interface Loan {
     state: string;
@@ -18,37 +22,47 @@ interface Loan {
     principal: string;
     interestRate: string;
     collateralKind: string;
-  }
-  
-  interface EnhancedLoan extends Omit<Loan, 'startDate'> {
+    collateralAddress: string;
+    vaultAddress: string | null;
+}
+
+interface EnhancedLoan extends Omit<Loan, 'startDate'> {
     startDate: moment.Moment;
     dueDate: moment.Moment;
     durationDays: number;
-  }
+    highestBid: number | null;
+    floorPrice: number | null;
+    isVault: boolean;
+}
 
-  async function getActiveLoans(): Promise<EnhancedLoan[] | null> {
+async function promptUser(): Promise<number> {
+  const { dueSoonHours } = await inquirer.prompt([
+    {
+      type: 'number',
+      name: 'dueSoonHours',
+      message: 'Enter the number of hours to consider for due soon loans:',
+      default: 12,
+      validate: (value: number) => value > 0 || 'Please enter a positive number',
+    },
+  ]);
+
+  return dueSoonHours;
+}
+
+async function getActiveLoans(dueSoonHours: number): Promise<EnhancedLoan[] | null> {
     try {
-        log('Starting to fetch loans');
+        console.log('Starting to fetch loans');
         
-        log('Making API request...');
         const loans = await arcadeApiRequest('GET', 'loans') as Loan[];
-        log('API request completed');
         
         if (!loans || loans.length === 0) {
-            log('No loans fetched');
             return null;
         }
 
-        log(`Total loans fetched: ${loans.length}`);
-        
         const currentDate = moment().utc();
-        const dueSoonHours = parseInt(process.env.DUE_SOON || '48', 10);
         const dueDateThreshold = moment().utc().add(dueSoonHours, 'hours');
 
-        log(`Current date (UTC): ${currentDate.format('YYYY-MM-DD HH:mm:ss')} (${currentDate.unix()})`);
-        log(`Due date threshold (UTC): ${dueDateThreshold.format('YYYY-MM-DD HH:mm:ss')} (${dueDateThreshold.unix()})`);
-
-        log('Filtering and processing loans...');
+        console.log('Filtering and processing loans...');
         const loansDueSoon = loans
             .filter(loan => loan.state === "Active" && loan.protocolVersion === "3")
             .map(loan => {
@@ -59,61 +73,106 @@ interface Loan {
                     ...loan,
                     startDate: startDate,
                     dueDate: dueDate,
-                    durationDays: moment.duration(durationSecs, 'seconds').asDays()
+                    durationDays: moment.duration(durationSecs, 'seconds').asDays(),
+                    isVault: loan.vaultAddress !== null,
+                    highestBid: null,
+                    floorPrice: null
                 } as EnhancedLoan;
             })
             .filter(loan => loan.dueDate.isBetween(currentDate, dueDateThreshold, null, '[]'))
             .sort((a, b) => a.dueDate.valueOf() - b.dueDate.valueOf());
 
-        log(`Found ${loansDueSoon.length} active loans with protocol version 3 expiring within the next ${dueSoonHours} hours`);
+        console.log(`Found ${loansDueSoon.length} active loans expiring within the next ${dueSoonHours} hours`);
 
-        if (loansDueSoon.length > 0) {
+        const DueSoon: EnhancedLoan[] = [];
+        for (const loan of loansDueSoon) {
+            if (!loan.isVault) {
+                const [highestBid, floorPrice] = await Promise.all([
+                    getHighestBid(loan.collateralAddress),
+                    getFloorPrice(loan.collateralAddress)
+                ]);
+                DueSoon.push({ ...loan, highestBid, floorPrice });
+            } else {
+                DueSoon.push(loan);
+            }
+            await setTimeout(500); // Rate limiting
+        }
+
+        console.log('Success fetching floor prices and highest bids');
+
+        if (DueSoon.length > 0) {
             const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
             const logFileName = `due_soon_loans_${timestamp}.log`;
-            const logHeader = `Due Soon Loans (next ${dueSoonHours} hours) - ${timestamp}\n\n`;
+            let logContent = `Due Soon Loans (next ${dueSoonHours} hours) - ${timestamp}\n\n`;
 
-            let logContent = logHeader;
-
-            loansDueSoon.forEach((loan, index) => {
+            DueSoon.forEach((loan, index) => {
                 const currencyCode = helpers.getNameByAddress(loan.payableCurrency);
-                const currencyDecimals = helpers.getCurrencyDecimals(currencyCode);
-                const principal = helpers.convertToDecimal(loan.principal, currencyDecimals);
+                const principal = helpers.convertByCurrency(currencyCode, loan.principal);
                 
-                const repaymentAmount = helpers.calculateRepaymentAmount(loan.principal, loan.interestRate, currencyDecimals);
-                const repaymentAmountConverted = helpers.convertToDecimal(repaymentAmount, currencyDecimals);
+                const repaymentAmount = helpers.calculateRepaymentAmount(loan.principal, loan.interestRate);
+                const repaymentAmountConverted = helpers.convertByCurrency(currencyCode, repaymentAmount);
                 
+                const durationInSeconds = loan.dueDate.diff(loan.startDate, 'seconds');
+                const apr = helpers.calculateAPR(
+                    ethers.BigNumber.from(loan.principal),
+                    ethers.BigNumber.from(repaymentAmount),
+                    durationInSeconds
+                );
+            
                 logContent += `Count ${index + 1}:\n`;
                 logContent += `  Loan ID: ${loan.loanId}\n`;
                 logContent += `  Due Date (UTC): ${loan.dueDate.format('YYYY-MM-DD HH:mm:ss')}\n`;
+                logContent += `  Is Vault: ${loan.isVault ? 'Yes' : 'No'}\n\n`;
+            
+                if (!loan.isVault) {
+                    const collectionName = collectionNameMap.get(loan.collateralAddress) || 'Unknown';
+                    logContent += `  Collection Name: ${collectionName}\n`;
+                    logContent += `  Floor Price: ${loan.floorPrice !== null ? `${loan.floorPrice.toFixed(5)} ETH` : 'N/A'}\n`;
+                    logContent += `  Highest Bid: ${loan.highestBid !== null ? `${loan.highestBid.toFixed(5)} ETH` : 'N/A'}\n\n`;
+                }
+            
+                logContent += `  Principal: ${principal} ${currencyCode}\n`;
+                logContent += `  Repayment: ${repaymentAmountConverted} ${currencyCode}\n`;
                 logContent += `  Duration: ${Math.floor(loan.durationDays)} days\n`;
-                logContent += `  Principal: ${principal.toFixed(3)} ${currencyCode}\n`;
-                logContent += `  Repayment Amount: ${repaymentAmountConverted.toFixed(3)} ${currencyCode}\n`;
-                logContent += `  Kind: ${loan.collateralKind}\n\n`;
+                logContent += `  APR: ${apr.toFixed(2)}%\n\n`;
             });
             
             fs.writeFileSync(logFileName, logContent);
-            log(`Loans expiring within the next ${dueSoonHours} hours logged to file: ${logFileName}`);
-        } else {
-            log('No loans due soon');
         }
 
-        return loansDueSoon;
+        return DueSoon;
     } catch (error) {
-        if (error instanceof Error) {
-            log(`Error in getActiveLoans: ${error.message}`);
-            console.error('Full error:', error);
-        } else {
-            log(`Unknown error in getActiveLoans`);
-            console.error('Full unknown error:', error);
-        }
+        console.error('Error in getActiveLoans:', error);
         return null;
     }
 }
 
-// At the end of your file, add:
-getActiveLoans().then(() => {
-    log('getActiveLoans completed');
-}).catch(error => {
-    log('Unhandled error in getActiveLoans');
-    console.error(error);
-});
+async function main() {
+    while (true) {
+        const dueSoonHours = await promptUser();
+        await getActiveLoans(dueSoonHours);
+        console.log('Getting DUE SOON loans completed');
+
+        const { action } = await inquirer.prompt([
+            {
+                type: 'list',
+                name: 'action',
+                message: 'What would you like to do next?',
+                choices: [
+                    { name: 'Get DUE SOON loans again', value: 'again' },
+                    { name: 'Go back to main menu', value: 'back' }
+                ]
+            }
+        ]);
+
+        if (action === 'back') {
+            break;
+        }
+    }
+}
+
+if (require.main === module) {
+    main().catch(console.error);
+}
+
+export { main as getLoans };

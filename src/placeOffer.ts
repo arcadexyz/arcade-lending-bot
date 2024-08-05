@@ -1,15 +1,19 @@
 import axios from 'axios';
-import { ethers, BigNumberish } from 'ethers';
+import { ethers } from 'ethers';
 import dotenv from 'dotenv';
 import { createLoanTermsSignature, LoanTermsPayload } from './createLoanTermsSignature';
 
 dotenv.config();
 
+export const VAULT_FACTORY_ADDRESS = "0x269363665dbb1582b143099a3cb467e98a476d55";
+
 type PlaceOfferParams = {
   loanTerms: LoanTermsPayload;
+  isVault: boolean;
+  kind: 'loan' | 'asset' | 'vault';
 };
 
-async function placeOffer({ loanTerms }: PlaceOfferParams) {
+async function placeOffer({ loanTerms, isVault, kind }: PlaceOfferParams) {
   try {
     const accountId = process.env.ACCOUNT_ID;
     const privateKey = process.env.PRIVATE_KEY;
@@ -23,7 +27,13 @@ async function placeOffer({ loanTerms }: PlaceOfferParams) {
 
     const currentNonce = ethers.BigNumber.from(Date.now());
 
-    const signature = await createLoanTermsSignature({ ...loanTerms, nonce: currentNonce }, signer);
+    const adjustedLoanTerms = {
+      ...loanTerms,
+      nonce: currentNonce,
+      collateralAddress: isVault ? VAULT_FACTORY_ADDRESS : loanTerms.collateralAddress
+    };
+
+    const signature = await createLoanTermsSignature(adjustedLoanTerms, signer);
 
     if (!signature) {
       throw new Error("Failed to create and sign loan terms");
@@ -31,20 +41,20 @@ async function placeOffer({ loanTerms }: PlaceOfferParams) {
 
     const apiPayload = {
       loanTerms: {
-        durationSecs: ethers.BigNumber.from(loanTerms.durationSecs).toNumber(),
-        principal: ethers.BigNumber.from(loanTerms.principal).toString(),
-        proratedInterestRate: ethers.BigNumber.from(loanTerms.interestRate).toString(),
-        collateralAddress: loanTerms.collateralAddress,
-        collateralId: ethers.BigNumber.from(loanTerms.collateralId).toString(),
-        payableCurrency: loanTerms.payableCurrency,
-        deadline: ethers.BigNumber.from(loanTerms.deadline).toString(),
+        durationSecs: ethers.BigNumber.from(adjustedLoanTerms.durationSecs).toNumber(),
+        principal: adjustedLoanTerms.principal,
+        proratedInterestRate: adjustedLoanTerms.interestRate,
+        collateralAddress: adjustedLoanTerms.collateralAddress,
+        collateralId: adjustedLoanTerms.collateralId,
+        payableCurrency: adjustedLoanTerms.payableCurrency,
+        deadline: ethers.BigNumber.from(adjustedLoanTerms.deadline).toString(),
         affiliateCode: "0x0000000000000000000000000000000000000000000000000000000000000000"
       },
-      collectionId: loanTerms.collateralAddress,
+      collectionId: isVault ? VAULT_FACTORY_ADDRESS : adjustedLoanTerms.collateralAddress,
       signature: signature,
       extraData: "0x0000000000000000000000000000000000000000000000000000000000000000",
       nonce: currentNonce.toString(),
-      kind: "asset",
+      kind: kind === 'loan' ? 'loan' : (isVault ? 'vault' : 'asset'),
       role: "lender"
     };
 
@@ -52,41 +62,15 @@ async function placeOffer({ loanTerms }: PlaceOfferParams) {
 
     const response = await axios.post(
       `https://api.arcade.xyz/api/v2/accounts/${accountId}/loanterms/`,
-
       apiPayload,
-      
     );
 
     console.log("Offer placed successfully:", response.data);
     return response.data;
-
   } catch (error) {
     console.error("Error placing offer:", error);
     throw error;
   }
 }
-
-async function main() {
-  const loanTerms: LoanTermsPayload = {
-    durationSecs: 86400 * 30, // 30 days
-    deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour
-    numInstallments: 0,
-    interestRate: "1300000000000000000000", // 13 % amount of interest
-    principal: "30000000", // 30 usdc
-    collateralAddress: "0x364c828ee171616a39897688a831c2499ad972ec", // Sappy Seal
-    collateralId: 3278,
-    payableCurrency: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // usdc
-    nonce: Date.now(),
-    side: 1 // lender
-  };
-
-  try {
-    const result = await placeOffer({ loanTerms });
-  } catch (error) {
-    console.error("Failed to place offer:", error);
-  }
-}
-
-main();
 
 export { placeOffer };
