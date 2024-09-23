@@ -58,14 +58,13 @@ async function placeOffer({ loanTerms, isVault, kind }: PlaceOfferParams) {
       role: "lender"
     };
 
-    console.log('Payload:', JSON.stringify(apiPayload, null, 2));
-
     const response = await axios.post(
       `https://api.arcade.xyz/api/v2/accounts/${accountId}/loanterms/`,
       apiPayload,
     );
 
-    console.log("Offer placed successfully:", response.data);
+    console.log("Offer placed successfully!");
+    console.log('Payload:', JSON.stringify(apiPayload, null, 2));
     return response.data;
   } catch (error) {
     console.error("Error placing offer:", error);

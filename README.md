@@ -1,22 +1,39 @@
 # Arcade.xyz Lending Bot
 
-Cooking...
+This tool allows you to programatically place offers on Arcade.xyz. You can place single or automated offers based on parameters you set. 
 
-# Roadmap
+# Prerequisites
 
-- [DONE] Place offers on existing listings
+- You have installed the latest version of Node.js and npm
 
-- [DONE] Support collection-wide offers
+- You have an Arcade.xyz API key (request one in the *Arcade Discord* if needed)
 
-- [DONE] Add functionality to place offers on loan that are expiring
+# How to run
 
-- [DONE] Add external data sources for valuation (reservoir, nftbank)
+- [1] Clone this repository:
 
-- [DONE] Review code and functionality by internal team. Fix suggestions / add improvements
+`git clone [repo-link]`
 
-- [DONE] Document(ReadMe), open-source release
+- [2] Navigate to the project directory:
 
-# Packages
+`cd arcade-xyz-lending-bot`
+
+- [3] Install dependancies:
+
+`npm install`
+
+- [4] Copy the environment template and add your keys:
+
+`cp .env_template .env`
+
+- [5] Edit .env file and add all necessary keys/parameters.
+
+- [6] Run with `ts-node run.ts`
+
+
+# Dependencies
+
+Key dependencies include:
 
 - @types/node@20.14.10
 - axios@1.7.2
@@ -25,3 +42,8 @@ Cooking...
 - typescript@5.5.3
 - node-fetch@2.7.0
 - for the full list please check package.json
+
+# Author
+
+Twitter: imgh05t
+Discord: imgh05t

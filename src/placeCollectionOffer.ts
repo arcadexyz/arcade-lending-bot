@@ -62,14 +62,12 @@ async function placeCollectionOffer({ offerTerms }: PlaceCollectionOfferParams) 
       itemPredicates: [itemPredicate]
     };
 
-    console.log('Payload:', JSON.stringify(apiPayload, null, 2));
-
     const response = await axios.post(
       `https://api.arcade.xyz/api/v2/accounts/${accountId}/loanterms/`,
       apiPayload
     );
 
-    console.log("Collection-wide offer placed successfully:", response.data);
+    console.log("Collection-wide offer placed successfully!");
     return response.data;
 
   } catch (error) {

@@ -16,15 +16,15 @@ enum OfferType {
 type Currency = helpers.CurrencyCode;
 
 interface UserAnswers {
-  offerType: OfferType;
+  offerType?: OfferType;
   loanId?: string;
-  collateralAddress: string;
-  collateralId: string;
-  durationDays: string;
-  principal: string;
-  repayment: string;
-  currency: Currency;
-  bidLifetime: string;
+  collateralAddress?: string;
+  collateralId?: string;
+  currency?: Currency;
+  principal?: string;
+  repayment?: string;
+  durationDays?: string;
+  bidLifetime?: string;
 }
 
 interface LoanDetails {
@@ -48,73 +48,146 @@ async function getLoanDetails(loanId: string): Promise<LoanDetails> {
       isVault: loan.vaultAddress !== null
     };
   } catch (error) {
-    console.error(`Failed to fetch loan details for loan ID ${loanId}:`, error);
+    console.error(`Failed to fetch loan details for loan ID ${loanId}: `, error);
     throw error;
   }
 }
 
-async function promptUser(): Promise<UserAnswers> {
-  const questions: inquirer.QuestionCollection<UserAnswers> = [
+async function promptOfferType(): Promise<OfferType | 'back'> {
+  const { offerType } = await inquirer.prompt<{ offerType: OfferType | 'back' }>([
     {
       type: 'list',
       name: 'offerType',
       message: 'What type of offer do you want to place?',
-      choices: Object.values(OfferType),
+      choices: [...Object.values(OfferType), 'Go Back'],
     },
-    {
-      type: 'input',
-      name: 'loanId',
-      message: 'Enter Loan ID:',
-      when: (answers: Partial<UserAnswers>) => answers.offerType === OfferType.LOAN_EXTENSION,
-    },
+  ]);
+
+  return offerType === 'back' ? 'back' : offerType;
+}
+
+async function promptLoanExtension(): Promise<string | 'back'> {
+  let loanId: string | 'back';
+  while (true) {
+    ({ loanId } = await inquirer.prompt<{ loanId: string | 'back' }>([
+      {
+        type: 'input',
+        name: 'loanId',
+        message: 'Enter Loan ID (or "back" to return):',
+        validate: (input) => {
+          if (input === 'back') return true;
+          if (!input) return 'Loan ID is required.';
+          return true;
+        },
+      },
+    ]));
+
+    if (loanId === 'back') return 'back';
+
+    try {
+      await getLoanDetails(loanId);
+      return loanId;
+    } catch (error) {
+      console.error(`Error fetching loan details for ID ${loanId}: `, error);
+      console.log('Please enter a valid loan ID or select "back".');
+    }
+  }
+}
+
+async function promptCollateralAddress(isCollection: boolean): Promise<string | 'back'> {
+  const { collateralAddress } = await inquirer.prompt<{ collateralAddress: string | 'back' }>([
     {
       type: 'input',
       name: 'collateralAddress',
-      message: (answers: Partial<UserAnswers>) => 
-        answers.offerType === OfferType.COLLECTION
-          ? 'Enter collateral address:'
-          : 'Enter collateral address (or vault factory address if it\'s a vault):',
-      when: (answers: Partial<UserAnswers>) => answers.offerType === OfferType.ASSET || answers.offerType === OfferType.COLLECTION,
-      validate: (value: string) => ethers.utils.isAddress(value) || 'Please enter a valid Ethereum address',
+      message: isCollection
+        ? 'Enter collateral address (or "back" to return):'
+        : 'Enter collateral address (or vault factory address if it\'s a vault) (or "back" to return):',
+      validate: (value: string) => 
+        value === 'back' || ethers.utils.isAddress(value) || 'Please enter a valid Ethereum address',
     },
+  ]);
+
+  return collateralAddress === 'back' ? 'back' : collateralAddress;
+}
+
+async function promptCollateralId(): Promise<string | 'back'> {
+  const { collateralId } = await inquirer.prompt<{ collateralId: string | 'back' }>([
     {
       type: 'input',
       name: 'collateralId',
-      message: 'Enter collateral ID (or vault ID if it\'s a vault):',
-      when: (answers: Partial<UserAnswers>) => answers.offerType === OfferType.ASSET,
+      message: 'Enter collateral ID (or vault ID if it\'s a vault) (or "back" to return):',
       validate: (value: string) => {
+        if (value === 'back') return true;
         const largeIntegerRegex = /^-?\d+$/;
         return largeIntegerRegex.test(value) || 'Please enter a valid integer number';
       },
     },
+  ]);
+
+  return collateralId === 'back' ? 'back' : collateralId;
+}
+
+async function promptCurrency(): Promise<Currency | 'back'> {
+  const { currency } = await inquirer.prompt<{ currency: Currency | 'back' }>([
     {
       type: 'list',
       name: 'currency',
       message: 'Select the currency for the loan:',
-      choices: Object.keys(helpers.CURRENCY_INFO),
+      choices: [...Object.keys(helpers.CURRENCY_INFO), 'back'],
     },
+  ]);
+
+  return currency === 'back' ? 'back' : currency;
+}
+
+async function promptPrincipal(currency: Currency): Promise<string | 'back'> {
+  const { principal } = await inquirer.prompt<{ principal: string | 'back' }>([
     {
       type: 'input',
       name: 'principal',
-      message: (answers: Partial<UserAnswers>) => `Enter principal amount in ${answers.currency}:`,
-      validate: (value: string) => !isNaN(parseFloat(value)) || 'Please enter a number',
+      message: `Enter principal amount in ${currency} (or "back" to return):`,
+      validate: (value: string) => 
+        value === 'back' || (!isNaN(parseFloat(value)) || 'Please enter a number'),
     },
+  ]);
+
+  return principal === 'back' ? 'back' : principal;
+}
+
+async function promptRepayment(currency: Currency, principal: string): Promise<string | 'back'> {
+  const { repayment } = await inquirer.prompt<{ repayment: string | 'back' }>([
     {
       type: 'input',
       name: 'repayment',
-      message: (answers: Partial<UserAnswers>) => `Enter repayment amount in ${answers.currency}:`,
-      validate: (value: string, answers: Partial<UserAnswers>) => {
+      message: `Enter repayment amount in ${currency} (or "back" to return):`,
+      validate: (value: string) => {
+        if (value === 'back') return true;
         const repayment = parseFloat(value);
-        const principal = parseFloat(answers.principal || '0');
-        return (!isNaN(repayment) && repayment > principal) || 'Repayment must be a number greater than the principal';
+        const principalValue = parseFloat(principal);
+        return (!isNaN(repayment) && repayment > principalValue) || 'Repayment must be a number greater than the principal';
       },
     },
+  ]);
+
+  return repayment === 'back' ? 'back' : repayment;
+}
+
+async function promptDuration(): Promise<string | 'back'> {
+  const { duration } = await inquirer.prompt<{ duration: string | 'back' }>([
     {
       type: 'input',
-      name: 'durationDays',
-      message: 'Enter loan duration in days:',
-      validate: (value: string) => !isNaN(parseInt(value)) || 'Please enter a number',
+      name: 'duration',
+      message: 'Enter loan duration in days (or "back" to return):',
+      validate: (value: string) => 
+        value === 'back' || (!isNaN(parseInt(value)) || 'Please enter a number'),
     },
+  ]);
+
+  return duration === 'back' ? 'back' : duration;
+}
+
+async function promptBidLifetime(): Promise<string | 'back'> {
+  const { bidLifetime } = await inquirer.prompt<{ bidLifetime: string | 'back' }>([
     {
       type: 'list',
       name: 'bidLifetime',
@@ -127,11 +200,60 @@ async function promptUser(): Promise<UserAnswers> {
         { name: '6 hours', value: '360' },
         { name: '12 hours', value: '720' },
         { name: '24 hours', value: '1440' },
+        'back',
       ],
     },
-  ];
+  ]);
 
-  return await inquirer.prompt<UserAnswers>(questions);
+  return bidLifetime === 'back' ? 'back' : bidLifetime;
+}
+
+async function promptUser(): Promise<UserAnswers | 'back'> {
+  const answers: UserAnswers = {};
+
+  const offerType = await promptOfferType();
+  if (offerType === 'back') return 'back';
+  answers.offerType = offerType;
+
+  if (answers.offerType === OfferType.LOAN_EXTENSION) {
+    const loanId = await promptLoanExtension();
+    if (loanId === 'back') return 'back';
+    answers.loanId = loanId;
+  }
+
+  if (answers.offerType === OfferType.ASSET || answers.offerType === OfferType.COLLECTION) {
+    const collateralAddress = await promptCollateralAddress(answers.offerType === OfferType.COLLECTION);
+    if (collateralAddress === 'back') return 'back';
+    answers.collateralAddress = collateralAddress;
+  }
+
+  if (answers.offerType === OfferType.ASSET) {
+    const collateralId = await promptCollateralId();
+    if (collateralId === 'back') return 'back';
+    answers.collateralId = collateralId;
+  }
+
+  const currency = await promptCurrency();
+  if (currency === 'back') return 'back';
+  answers.currency = currency;
+
+  const principal = await promptPrincipal(currency);
+  if (principal === 'back') return 'back';
+  answers.principal = principal;
+
+  const repayment = await promptRepayment(currency, principal);
+  if (repayment === 'back') return 'back';
+  answers.repayment = repayment;
+
+  const durationDays = await promptDuration();
+  if (durationDays === 'back') return 'back';
+  answers.durationDays = durationDays;
+
+  const bidLifetime = await promptBidLifetime();
+  if (bidLifetime === 'back') return 'back';
+  answers.bidLifetime = bidLifetime;
+
+  return answers;
 }
 
 function displayTermsForConfirmation(
@@ -153,12 +275,12 @@ function displayTermsForConfirmation(
   );
 
   return `
-Principal: ${principalFormatted} ${payableCurrency}
-Repayment: ${repaymentFormatted} ${payableCurrency}
-Interest Rate: ${interestRateFormatted}%
-Duration: ${durationInDays} days
-Estimated APR: ${apr.toFixed(2)}%
-`;
+    Principal: ${principalFormatted} ${payableCurrency}
+    Repayment: ${repaymentFormatted} ${payableCurrency}
+    Interest Rate: ${interestRateFormatted}%
+    Duration: ${durationInDays} days
+    Estimated APR: ${apr.toFixed(2)}%
+    `;
 }
 
 async function confirmOffer(offerDetails: string): Promise<boolean> {
@@ -173,11 +295,15 @@ async function confirmOffer(offerDetails: string): Promise<boolean> {
   return confirmed;
 }
 
-async function main() {
+export async function main(): Promise<UserAnswers | 'back'> {
   const answers = await promptUser();
 
-  const principal = helpers.calculateProtocolPrincipal(answers.principal, answers.currency);
-  const repayment = helpers.calculateProtocolPrincipal(answers.repayment, answers.currency);
+  if (answers === 'back') {
+    return 'back';
+  }
+
+  const principal = helpers.calculateProtocolPrincipal(answers.principal!, answers.currency!);
+  const repayment = helpers.calculateProtocolPrincipal(answers.repayment!, answers.currency!);
   
   const formattedInterestRate = helpers.calculateInterestRate(
     principal.toString(),
@@ -185,11 +311,11 @@ async function main() {
   );
   
   const commonTerms = {
-    durationSecs: helpers.daysToSeconds(parseInt(answers.durationDays)),
-    deadline: helpers.makeDeadline(parseInt(answers.bidLifetime)),
+    durationSecs: helpers.daysToSeconds(parseInt(answers.durationDays!)),
+    deadline: helpers.makeDeadline(parseInt(answers.bidLifetime!)),
     interestRate: formattedInterestRate,
     principal: principal.toString(),
-    payableCurrency: helpers.makePayableCurrency(answers.currency).address,
+    payableCurrency: helpers.makePayableCurrency(answers.currency!).address,
     nonce: Date.now(),
     side: 1 as const, // lender
   };
@@ -197,8 +323,8 @@ async function main() {
   const offerDetails = displayTermsForConfirmation(
     principal.toString(),
     formattedInterestRate,
-    parseInt(answers.durationDays),
-    answers.currency,
+    parseInt(answers.durationDays!),
+    answers.currency!,
     repayment.toString()
   );
 
@@ -206,7 +332,7 @@ async function main() {
 
   if (!confirmed) {
     console.log("Offer placement cancelled.");
-    return;
+    return 'back';
   }
 
   try {
@@ -215,7 +341,7 @@ async function main() {
       const collectionOfferTerms: CollectionWideOfferPayload = {
         ...commonTerms,
         proratedInterestRate: formattedInterestRate,
-        collateralAddress: answers.collateralAddress,
+        collateralAddress: answers.collateralAddress!,
         items: [],
         affiliateCode: ethers.constants.HashZero,
       };
@@ -226,9 +352,9 @@ async function main() {
         loanDetails = await getLoanDetails(answers.loanId!);
       } else {
         loanDetails = {
-          collateralAddress: answers.collateralAddress,
-          collateralId: answers.collateralId,
-          isVault: answers.collateralAddress.toLowerCase() === VAULT_FACTORY_ADDRESS.toLowerCase()
+          collateralAddress: answers.collateralAddress!,
+          collateralId: answers.collateralId!,
+          isVault: answers.collateralAddress!.toLowerCase() === VAULT_FACTORY_ADDRESS.toLowerCase()
         };
       }
       const loanTerms: LoanTermsPayload = {
@@ -245,8 +371,10 @@ async function main() {
       });
     }
     console.log("Offer placed successfully");
+    return answers;
   } catch (error) {
     console.error("Failed to place offer:", error);
+    return 'back';
   }
 }
 
