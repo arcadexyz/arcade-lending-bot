@@ -2,6 +2,10 @@
 
 This tool allows you to programatically place offers on Arcade.xyz. You can place single or automated offers based on parameters you set. 
 
+<p align="center">
+  <img src="https://github.com/arcadexyz/arcade-lending-bot/blob/main/console_screenshot.png?raw=true" alt="Arcade.xyz Lending Bot">
+</p>
+
 # Prerequisites
 
 - You have installed the latest version of Node.js and npm
@@ -10,21 +14,13 @@ This tool allows you to programatically place offers on Arcade.xyz. You can plac
 
 # How to run
 
-- [1] Clone this repository:
+- [1] Clone this repository: `git clone [repo-link]`
 
-`git clone [repo-link]`
+- [2] Navigate to the project directory: `cd arcade-xyz-lending-bot`
 
-- [2] Navigate to the project directory:
+- [3] Install dependancies: `npm install`
 
-`cd arcade-xyz-lending-bot`
-
-- [3] Install dependancies:
-
-`npm install`
-
-- [4] Copy the environment template and add your keys:
-
-`cp .env_template .env`
+- [4] Copy the environment template and add your keys: `cp .env_template .env`
 
 - [5] Edit .env file and add all necessary keys/parameters.
 
