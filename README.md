@@ -7,7 +7,7 @@ Arcade.xyz docs: https://docs.arcade.xyz/docs/arcade-faq
 For support: discord.gg/arcadexyz (Open ticket or use dev/support channel)
 
 <p align="center">
-  <img src="https://github.com/arcadexyz/arcade-lending-bot/public/blob/main/console_screenshot.png?raw=true" alt="Arcade.xyz Lending Bot">
+  <img src="https://github.com/arcadexyz/arcade-lending-bot/blob/main/public/console_screenshot.png?raw=true" alt="Arcade.xyz Lending Bot">
 </p>
 
 # Prerequisites
