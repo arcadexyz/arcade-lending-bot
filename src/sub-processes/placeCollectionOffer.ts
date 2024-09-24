@@ -5,8 +5,6 @@ import { createCollectionWideOfferSignature, CollectionWideOfferPayload, createP
 
 dotenv.config();
 
-const COLLECTION_OFFER_VERIFIER = '0x1B6e58AaE43bFd2a435AA348F3328f3137DDA544';
-
 type PlaceCollectionOfferParams = {
   offerTerms: CollectionWideOfferPayload;
 };

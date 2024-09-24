@@ -1,11 +1,11 @@
 import inquirer from 'inquirer';
 import { ethers } from 'ethers';
 import { setTimeout } from 'timers/promises';
-import { getFloorPrice } from './reservoir';
-import { getETHToTokenRate } from './coingeckoRates';
-import { CollectionWideOfferPayload, createCollectionWideOfferSignature } from './createCollectionOfferSignature';
-import { placeCollectionOffer } from './placeCollectionOffer';
-import * as helpers from './helpers';
+import { getFloorPrice } from '../sub-processes/reservoir';
+import { getETHToTokenRate } from '../sub-processes/coingeckoRates';
+import { CollectionWideOfferPayload, createCollectionWideOfferSignature } from '../sub-processes/createCollectionOfferSignature';
+import { placeCollectionOffer } from '../sub-processes/placeCollectionOffer';
+import * as helpers from '../utils/helpers';
 import fs from 'fs';
 import path from 'path';
 
@@ -85,7 +85,7 @@ interface CollectionData {
   }
   
   function getCollectionNames(): Map<string, string> {
-    const collectionsData = fs.readFileSync(path.join(__dirname, '..', 'collections_data.json'), 'utf8');
+    const collectionsData = fs.readFileSync(path.join(__dirname, '..', '..', 'data', 'collections_data.json'), 'utf8');
     const collections: CollectionData[] = JSON.parse(collectionsData);
     return new Map(collections.map(c => [c.id.toLowerCase(), c.name]));
   }

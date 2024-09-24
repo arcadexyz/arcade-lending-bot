@@ -3,12 +3,12 @@ import { ethers } from 'ethers';
 import moment from 'moment';
 import fs from 'fs';
 import path from 'path';
-import { arcadeApiRequest } from './arcadeapi';
-import * as helpers from './helpers';
+import { arcadeApiRequest } from '../sub-processes/arcadeapi';
+import * as helpers from '../utils/helpers';
 import { setTimeout } from 'timers/promises';
-import { getHighestBid, getFloorPrice } from './reservoir';
+import { getHighestBid, getFloorPrice } from '../sub-processes/reservoir';
 
-const collectionsData = fs.readFileSync(path.join(__dirname, '..', 'collections_data.json'), 'utf8');
+const collectionsData = fs.readFileSync(path.join(__dirname, '..', '..', 'data', 'collections_data.json'), 'utf8');
 const collections: { id: string; name: string }[] = JSON.parse(collectionsData);
 const collectionNameMap = new Map(collections.map(c => [c.id, c.name]));
 

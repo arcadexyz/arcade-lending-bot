@@ -24,9 +24,10 @@ function displayBanner() {
 }
 
 async function runScript(scriptName: string): Promise<void> {
-  const scriptPath = path.join(__dirname, 'src', `${scriptName}.ts`);
+  const scriptPath = path.join(__dirname, 'processes', `${scriptName}.ts`);
   
   console.log(`\x1b[32mRunning ${scriptName}...\x1b[0m`);
+  console.log(`Script path: ${scriptPath}`); // For debugging
 
   const childProcess = spawn('npx', ['ts-node', scriptPath], {
     stdio: 'inherit',

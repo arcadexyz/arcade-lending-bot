@@ -1,30 +1,36 @@
 # Arcade.xyz Lending Bot
 
-This tool allows you to programatically place offers on Arcade.xyz. You can place single or automated offers based on parameters you set. 
+The Arcade.xyz Lending Bot is a command-line tool that empowers lenders to automate and optimize their lending strategies on Arcade.xyz by programmatically placing and managing loan offers, enabling efficient participation in the lending market.
+
+Arcade.xyz docs: https://docs.arcade.xyz/docs/arcade-faq
+
+For support: discord.gg/arcadexyz (Open ticket or use dev/support channel)
 
 <p align="center">
-  <img src="https://github.com/arcadexyz/arcade-lending-bot/blob/main/console_screenshot.png?raw=true" alt="Arcade.xyz Lending Bot">
+  <img src="https://github.com/arcadexyz/arcade-lending-bot/public/blob/main/console_screenshot.png?raw=true" alt="Arcade.xyz Lending Bot">
 </p>
 
 # Prerequisites
 
 - You have installed the latest version of Node.js and npm
 
-- You have an Arcade.xyz API key (request one in the *Arcade Discord* if needed)
+- You have an Arcade.xyz API key (request one in the Arcade's Discord if needed)
 
-# How to run
+- You have set protocol spending allowance on wallet that you'll be using in this bot. You can do it here: https://app.arcade.xyz/account/settings
 
-- [1] Clone this repository: `git clone [repo-link]`
+# Run the Lending Bot
 
-- [2] Navigate to the project directory: `cd arcade-xyz-lending-bot`
+1. Clone this repository: `git clone https://github.com/arcadexyz/arcade-lending-bot`
 
-- [3] Install dependancies: `npm install`
+2. Navigate to the project directory: `cd arcade-lending-bot`
 
-- [4] Copy the environment template and add your keys: `cp .env_template .env`
+3. Install dependancies: `npm install`
 
-- [5] Edit .env file and add all necessary keys/parameters.
+4. Copy the environment template and add your keys: `cp example.env .env`
 
-- [6] Run with `ts-node run.ts`
+5. Edit .env file and add all necessary keys/parameters.
+
+6. Run with `npm run`
 
 
 # Dependencies

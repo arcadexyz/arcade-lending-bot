@@ -8,14 +8,14 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "resolveJsonModule": true,
-    "baseUrl": ".",
-    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "baseUrl": "./src",
+    "typeRoots": ["../node_modules/@types", "./types"],
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": false
   },
-  "include": ["src/**/*", "*.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts", "dist"]
 }

@@ -1,5 +1,5 @@
 import fetch from 'node-fetch';
-import { CurrencyCode, CURRENCY_INFO } from './helpers';
+import { CurrencyCode, CURRENCY_INFO } from '../utils/helpers';
 
 function getCurrencySymbol(currency: CurrencyCode): string {
     switch(currency) {

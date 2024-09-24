@@ -2,10 +2,9 @@ import axios from 'axios';
 import { ethers } from 'ethers';
 import dotenv from 'dotenv';
 import { createLoanTermsSignature, LoanTermsPayload } from './createLoanTermsSignature';
+import { CONFIG_ETH_MAINNET_V3 } from '../utils/constants';
 
 dotenv.config();
-
-export const VAULT_FACTORY_ADDRESS = "0x269363665dbb1582b143099a3cb467e98a476d55";
 
 type PlaceOfferParams = {
   loanTerms: LoanTermsPayload;
@@ -30,7 +29,7 @@ async function placeOffer({ loanTerms, isVault, kind }: PlaceOfferParams) {
     const adjustedLoanTerms = {
       ...loanTerms,
       nonce: currentNonce,
-      collateralAddress: isVault ? VAULT_FACTORY_ADDRESS : loanTerms.collateralAddress
+      collateralAddress: isVault ? CONFIG_ETH_MAINNET_V3.vaultFactory : loanTerms.collateralAddress
     };
 
     const signature = await createLoanTermsSignature(adjustedLoanTerms, signer);
@@ -50,7 +49,7 @@ async function placeOffer({ loanTerms, isVault, kind }: PlaceOfferParams) {
         deadline: ethers.BigNumber.from(adjustedLoanTerms.deadline).toString(),
         affiliateCode: "0x0000000000000000000000000000000000000000000000000000000000000000"
       },
-      collectionId: isVault ? VAULT_FACTORY_ADDRESS : adjustedLoanTerms.collateralAddress,
+      collectionId: isVault ? CONFIG_ETH_MAINNET_V3.vaultFactory : adjustedLoanTerms.collateralAddress,
       signature: signature,
       extraData: "0x0000000000000000000000000000000000000000000000000000000000000000",
       nonce: currentNonce.toString(),

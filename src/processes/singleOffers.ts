@@ -1,11 +1,12 @@
 import * as inquirer from 'inquirer';
 import { ethers } from 'ethers';
-import { placeOffer, VAULT_FACTORY_ADDRESS } from './placeOffer';
-import { LoanTermsPayload } from './createLoanTermsSignature';
-import { placeCollectionOffer } from './placeCollectionOffer';
-import { CollectionWideOfferPayload } from './createCollectionOfferSignature';
-import { arcadeApiRequest } from './arcadeapi';
-import * as helpers from './helpers';
+import { placeOffer } from '../sub-processes/placeOffer';
+import { CONFIG_ETH_MAINNET_V3 } from '../utils/constants';
+import { LoanTermsPayload } from '../sub-processes/createLoanTermsSignature';
+import { placeCollectionOffer } from '../sub-processes/placeCollectionOffer';
+import { CollectionWideOfferPayload } from '../sub-processes/createCollectionOfferSignature';
+import { arcadeApiRequest } from '../sub-processes/arcadeapi';
+import * as helpers from '../utils/helpers';
 
 enum OfferType {
   LOAN_EXTENSION = 'Loan Extension',
@@ -354,7 +355,7 @@ export async function main(): Promise<UserAnswers | 'back'> {
         loanDetails = {
           collateralAddress: answers.collateralAddress!,
           collateralId: answers.collateralId!,
-          isVault: answers.collateralAddress!.toLowerCase() === VAULT_FACTORY_ADDRESS.toLowerCase()
+          isVault: answers.collateralAddress!.toLowerCase() === CONFIG_ETH_MAINNET_V3.vaultFactory.toLowerCase()
         };
       }
       const loanTerms: LoanTermsPayload = {

@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { arcadeApiRequest } from './arcadeapi';
+import { arcadeApiRequest } from '../sub-processes/arcadeapi';
 import fs from 'fs';
 import moment from 'moment';
 
